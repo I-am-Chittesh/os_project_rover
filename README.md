@@ -1,7 +1,8 @@
-# os_project_rover# Project Sentinel: Autonomous Ecological & Agricultural Rover
+# Honeybadger
+### Autonomous Ecological & Agricultural Rover
 
 ## Overview
-Project Sentinel is an autonomous ground-monitoring vehicle designed to patrol vast agricultural lands and forestry reserves. It acts as an independent, on-the-ground scout for farmers, conservationists, and estate managers, navigating complex terrain to monitor wildlife, track pest populations, and assess environmental hazards in real time.
+Project Honeybadger is an autonomous ground-monitoring vehicle designed to patrol vast agricultural lands and forestry reserves. It acts as an independent, on-the-ground scout for farmers, conservationists, and estate managers, navigating complex terrain to monitor wildlife, track pest populations, and assess environmental hazards in real time.
 
 ## Problem Statement
 Managing large tracts of farmland or protected forest is logistically overwhelming for human teams. While satellites and drones provide excellent high-level overviews, they cannot look beneath the canopy, identify specific ground-level pests, or confirm the severity of ground conditions. Conversely, manual human patrols are slow, labor-intensive, and often disrupt the wildlife researchers are attempting to study. There is a critical gap between receiving a high-level environmental alert and confirming the reality on the ground.
@@ -11,6 +12,9 @@ Managing large tracts of farmland or protected forest is logistically overwhelmi
 * **Hazard Ground-Truthing:** Navigates to areas flagged for potential environmental damage (such as flooding or landslides) to provide immediate visual confirmation to off-site managers.
 * **Localized Field Alerts:** Displays localized warnings (e.g., "Active Flood Zone" or "Predator Sighted") on an exterior screen to warn human workers or rangers who are currently operating in the field.
 
+---
+## Design and CAD
+[CAD Models](./cad_models)
 ---
 
 ## Satellite Integration: "Eye in the Sky, Boots on the Ground"
