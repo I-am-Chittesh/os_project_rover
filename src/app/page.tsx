@@ -163,7 +163,7 @@ function CameraOverlay({
       context.strokeRect(drawX, drawY, drawWidth, drawHeight);
       context.setLineDash([]);
       context.fillStyle = color;
-      context.font = "700 11px Arial";
+      context.font = '700 11px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
       const tag = `${detection.class.toUpperCase()}  ${Math.round(detection.score * 100)}%`;
       const tagWidth = context.measureText(tag).width + 16;
       context.fillRect(drawX, Math.max(0, drawY - 24), tagWidth, 22);
@@ -193,6 +193,8 @@ export default function Home() {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const [adminAction, setAdminAction] = useState("Mission overview");
+  const [cameraPaused, setCameraPaused] = useState(false);
+  const [showSystemSettings, setShowSystemSettings] = useState(false);
   const [telemetry, setTelemetry] = useState<Telemetry>({
     signal: 96,
     battery: 84,
@@ -375,6 +377,33 @@ export default function Home() {
     };
   }, [captureEvent]);
 
+  const selectAdminAction = (label: string) => {
+    setAdminAction(label);
+    setAdminMenuOpen(false);
+    if (label === "Camera controls") {
+      setCameraPaused((paused) => {
+        const nextPaused = !paused;
+        if (nextPaused) videoRef.current?.pause();
+        else void videoRef.current?.play();
+        return nextPaused;
+      });
+    }
+    if (label === "System settings") setShowSystemSettings((open) => !open);
+    if (label === "Export session") {
+      const payload = JSON.stringify(
+        { product: "honeybadger", exportedAt: new Date().toISOString(), events },
+        null,
+        2,
+      );
+      const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "honeybadger-session.json";
+      anchor.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
   return (
     <main className="sentinel-app">
       <header className="topbar">
@@ -383,7 +412,7 @@ export default function Home() {
             <Sparkles size={19} />
           </div>
           <div>
-            <p className="brand-name">HONEYBADGER</p>
+            <p className="brand-name">honeybadger</p>
             <p className="brand-subtitle">FIELD INTELLIGENCE / ROVER 01</p>
           </div>
         </div>
@@ -423,10 +452,7 @@ export default function Home() {
                   <button
                     className={adminAction === label ? "admin-option active" : "admin-option"}
                     key={label as string}
-                    onClick={() => {
-                      setAdminAction(label as string);
-                      setAdminMenuOpen(false);
-                    }}
+                    onClick={() => selectAdminAction(label as string)}
                   >
                     <Icon size={15} />
                     <span>{label as string}</span>
@@ -495,7 +521,7 @@ export default function Home() {
               </h1>
             </div>
             <div className="model-badge">
-              <ScanSearch size={15} /> {modelState}
+              <ScanSearch size={15} /> {showSystemSettings ? "SYSTEM SETTINGS" : modelState}
             </div>
           </div>
           <div className="vision-frame" ref={viewportRef}>
@@ -519,8 +545,8 @@ export default function Home() {
               height={viewport.height}
             />
             <div className="camera-status">
-              <span className="recording-dot" /> CAM-01: ACTIVE{" "}
-              <small>â— LOCAL FEED</small>
+              <span className="recording-dot" /> CAM-01: {cameraPaused ? "PAUSED" : "ACTIVE"}{" "}
+              <small>LOCAL FEED</small>
             </div>
             <div className="frame-corner corner-tl" />
             <div className="frame-corner corner-tr" />
@@ -528,7 +554,7 @@ export default function Home() {
             <div className="frame-corner corner-br" />
             <div className="vision-footer">
               <span>
-                <Radio size={13} /> 1280 Ã— 720
+                <Radio size={13} /> 1280 x 720
               </span>
               <span>
                 AI SCAN <b>{detections.length ? "TRACKING" : "STANDBY"}</b>
