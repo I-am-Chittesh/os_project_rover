@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sentinel OS | Field Intelligence",
+  title: "Honeybadger | Field Intelligence",
   description: "Local vision telemetry dashboard for Project Sentinel.",
 };
 
