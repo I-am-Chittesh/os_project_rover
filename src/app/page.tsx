@@ -391,7 +391,7 @@ export default function Home() {
     if (label === "System settings") setShowSystemSettings((open) => !open);
     if (label === "Export session") {
       const payload = JSON.stringify(
-        { product: "honeybadger", exportedAt: new Date().toISOString(), events },
+        { product: "honeybadger.", exportedAt: new Date().toISOString(), events },
         null,
         2,
       );
