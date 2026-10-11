@@ -32,3 +32,24 @@ Beyond basic ecological monitoring, an autonomous, vision-enabled rover is capab
 * **Anti-Poaching & Snare Detection:** In wildlife reserves, poachers set wire snares that are invisible from the air. The low-to-the-ground rover uses computer vision to recognize the unnatural shapes or metallic glint of traps, alerting park rangers to their exact location.
 * **Livestock Perimeter Defense:** On large ranches, the rover patrols the fenceline at night. It identifies breaches in the fencing, locates stray animals, and detects predators (like wolves or coyotes) approaching the perimeter.
 * **Post-Disaster Infrastructure Assessment:** After a severe storm or flash flood, the rover is deployed to inspect rural bridges, retaining walls, or farm roads, confirming if the infrastructure is intact before humans risk driving heavy farming equipment over it.
+
+---
+## Local Computer Vision Pipeline
+
+The dashboard connects to the local YOLOv8 Nano service in
+[`vision_backend/`](./vision_backend). Start it before opening the dashboard:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r vision_backend\requirements.txt
+python -m uvicorn vision_backend.main:app --host 127.0.0.1 --port 8000
+```
+
+Then run the dashboard with `npm run dev` and open `http://localhost:3000`.
+The backend publishes the annotated low-latency MJPEG feed at
+`http://127.0.0.1:8000/video_feed`; the dashboard also polls
+`/detections` to populate the recent sightings log. The first backend startup
+downloads the `yolov8n.pt` model. See
+[`vision_backend/README.md`](./vision_backend/README.md) for camera and model
+configuration.
