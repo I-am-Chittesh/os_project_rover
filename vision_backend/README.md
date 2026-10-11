@@ -8,7 +8,7 @@ annotated feed used by the dashboard.
 From the repository root:
 
 ```powershell
-py -m venv .venv
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r vision_backend\requirements.txt
 python -m uvicorn vision_backend.main:app --host 127.0.0.1 --port 8000

@@ -40,7 +40,7 @@ The dashboard connects to the local YOLOv8 Nano service in
 [`vision_backend/`](./vision_backend). Start it before opening the dashboard:
 
 ```powershell
-py -m venv .venv
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r vision_backend\requirements.txt
 python -m uvicorn vision_backend.main:app --host 127.0.0.1 --port 8000

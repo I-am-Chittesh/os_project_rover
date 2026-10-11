@@ -517,6 +517,22 @@ button {
 .camera-placeholder span {
   font-size: 10px;
 }
+.retry-camera {
+  margin-top: 7px;
+  padding: 9px 13px;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  color: #3e5b50;
+  background: #ffffffb8;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+.retry-camera:hover {
+  color: var(--periwinkle);
+  transform: translateY(-1px);
+}
 .detection-canvas {
   position: absolute;
   inset: 0;

@@ -129,6 +129,7 @@ export default function Home() {
   const lastLogRef = useRef<Record<string, number>>({});
   const [cameraState, setCameraState] = useState("CONNECTING VISION BACKEND");
   const [modelState, setModelState] = useState("WAITING FOR YOLOV8");
+  const [backendError, setBackendError] = useState(false);
   const [detections, setDetections] = useState<Detection[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
@@ -148,10 +149,12 @@ export default function Home() {
     const handleLoad = () => {
       setCameraState("CAMERA ONLINE");
       setModelState("YOLOV8 NANO ONLINE");
+      setBackendError(false);
     };
     const handleError = () => {
       setCameraState("VISION BACKEND OFFLINE");
       setModelState("START BACKEND TO CONNECT");
+      setBackendError(true);
     };
     stream.addEventListener("load", handleLoad);
     stream.addEventListener("error", handleError);
@@ -229,6 +232,7 @@ export default function Home() {
         if (!cancelled) {
           setCameraState("VISION BACKEND OFFLINE");
           setModelState("START BACKEND TO CONNECT");
+          setBackendError(true);
           setDetections([]);
         }
       }
@@ -252,6 +256,7 @@ export default function Home() {
             setCameraState("CAMERA PAUSED");
           } else if (streamRef.current) {
             setCameraState("CONNECTING VISION BACKEND");
+            setBackendError(false);
             streamRef.current.src = `${visionBackendUrl}/video_feed`;
           }
           return nextPaused;
@@ -403,7 +408,26 @@ export default function Home() {
               <div className="camera-placeholder">
                 <Camera size={30} />
                 <strong>{cameraState}</strong>
-                <span>Allow camera access to begin local vision capture</span>
+                <span>
+                  {backendError
+                    ? "Run the local YOLO backend, then retry this feed"
+                    : "Connecting to the local YOLOv8 vision service"}
+                </span>
+                {backendError && (
+                  <button
+                    className="retry-camera"
+                    onClick={() => {
+                      setCameraState("CONNECTING VISION BACKEND");
+                      setModelState("WAITING FOR YOLOV8");
+                      setBackendError(false);
+                      if (streamRef.current) {
+                        streamRef.current.src = `${visionBackendUrl}/video_feed?retry=${Date.now()}`;
+                      }
+                    }}
+                  >
+                    RETRY CONNECTION
+                  </button>
+                )}
               </div>
             )}
             <div className="camera-status">
