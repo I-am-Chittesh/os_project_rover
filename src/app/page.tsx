@@ -21,13 +21,12 @@ import {
   Waves,
   Wifi,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Detection = {
   bbox: [number, number, number, number];
   class: string;
   score: number;
-  born: number;
 };
 type EventItem = {
   id: number;
@@ -43,8 +42,9 @@ type Telemetry = {
   speed: number;
 };
 
-const accents = ["#ff5c8a", "#7767ff", "#00bfa6", "#ffb000"];
 const terrainNames = ["MEADOW", "GRAVEL", "LOAM", "WETLAND"];
+const visionBackendUrl =
+  process.env.NEXT_PUBLIC_VISION_BACKEND_URL || "http://127.0.0.1:8000";
 
 function Metric({
   icon: Icon,
@@ -124,73 +124,13 @@ function MapPanel() {
   );
 }
 
-function CameraOverlay({
-  detections,
-  width,
-  height,
-}: {
-  detections: Detection[];
-  width: number;
-  height: number;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !width || !height) return;
-    const scale = window.devicePixelRatio || 1;
-    canvas.width = width * scale;
-    canvas.height = height * scale;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    context.scale(scale, scale);
-    context.clearRect(0, 0, width, height);
-    detections.forEach((detection, index) => {
-      const [x, y, boxWidth, boxHeight] = detection.bbox;
-      const progress = Math.min(1, (performance.now() - detection.born) / 280);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const color = accents[index % accents.length];
-      const centerX = x + boxWidth / 2;
-      const centerY = y + boxHeight / 2;
-      const drawWidth = boxWidth * eased;
-      const drawHeight = boxHeight * eased;
-      const drawX = centerX - drawWidth / 2;
-      const drawY = centerY - drawHeight / 2;
-      context.strokeStyle = color;
-      context.lineWidth = 2;
-      context.setLineDash([8, 5]);
-      context.strokeRect(drawX, drawY, drawWidth, drawHeight);
-      context.setLineDash([]);
-      context.fillStyle = color;
-      context.font = '700 11px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
-      const tag = `${detection.class.toUpperCase()}  ${Math.round(detection.score * 100)}%`;
-      const tagWidth = context.measureText(tag).width + 16;
-      context.fillRect(drawX, Math.max(0, drawY - 24), tagWidth, 22);
-      context.fillStyle = "#fff";
-      context.fillText(tag, drawX + 8, Math.max(15, drawY - 9));
-    });
-  }, [detections, width, height]);
-  return (
-    <canvas
-      ref={canvasRef}
-      className="detection-canvas"
-      aria-label="Object detection overlay"
-    />
-  );
-}
-
 export default function Home() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const frameRef = useRef<HTMLCanvasElement>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number | null>(null);
+  const streamRef = useRef<HTMLImageElement>(null);
   const lastLogRef = useRef<Record<string, number>>({});
-  const [cameraState, setCameraState] = useState("REQUESTING CAMERA");
-  const [modelState, setModelState] = useState("LOADING VISION MODEL");
+  const [cameraState, setCameraState] = useState("CONNECTING VISION BACKEND");
+  const [modelState, setModelState] = useState("WAITING FOR YOLOV8");
   const [detections, setDetections] = useState<Detection[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const [adminAction, setAdminAction] = useState("Mission overview");
   const [cameraPaused, setCameraPaused] = useState(false);
@@ -202,90 +142,27 @@ export default function Home() {
     speed: 1.8,
   });
 
-  const captureEvent = useCallback(
-    (
-      label: string,
-      confidence: number,
-      bbox: [number, number, number, number],
-    ) => {
-      const canvas = frameRef.current;
-      const video = videoRef.current;
-      if (!canvas || !video || video.readyState < 2) return;
-      const [x, y, width, height] = bbox;
-      canvas.width = Math.max(80, width);
-      canvas.height = Math.max(60, height);
-      canvas
-        .getContext("2d")
-        ?.drawImage(
-          video,
-          x,
-          y,
-          width,
-          height,
-          0,
-          0,
-          canvas.width,
-          canvas.height,
-        );
-      const thumbnail = canvas.toDataURL("image/jpeg", 0.76);
-      setEvents((current) =>
-        [
-          {
-            id: Date.now(),
-            timestamp: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            }),
-            label,
-            confidence,
-            thumbnail_base64: thumbnail,
-          },
-          ...current,
-        ].slice(0, 8),
-      );
-    },
-    [],
-  );
-
   useEffect(() => {
-    let stream: MediaStream | undefined;
-    let cancelled = false;
-    async function startCamera() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "user",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        });
-        if (cancelled || !videoRef.current) return;
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraState("CAMERA ONLINE");
-      } catch {
-        setCameraState("CAMERA UNAVAILABLE");
-      }
-    }
-    startCamera();
+    const stream = streamRef.current;
+    if (!stream) return;
+    const handleLoad = () => {
+      setCameraState("CAMERA ONLINE");
+      setModelState("YOLOV8 NANO ONLINE");
+    };
+    const handleError = () => {
+      setCameraState("VISION BACKEND OFFLINE");
+      setModelState("START BACKEND TO CONNECT");
+    };
+    stream.addEventListener("load", handleLoad);
+    stream.addEventListener("error", handleError);
+    stream.src = `${visionBackendUrl}/video_feed`;
     return () => {
-      cancelled = true;
-      stream?.getTracks().forEach((track) => track.stop());
+      stream.removeEventListener("load", handleLoad);
+      stream.removeEventListener("error", handleError);
+      stream.removeAttribute("src");
     };
   }, []);
 
-  useEffect(() => {
-    const observer = new ResizeObserver(([entry]) =>
-      setViewport({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
-      }),
-    );
-    if (viewportRef.current) observer.observe(viewportRef.current);
-    return () => observer.disconnect();
-  }, []);
   useEffect(() => {
     const interval = window.setInterval(
       () =>
@@ -315,67 +192,54 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    let model: {
-      detect: (
-        video: HTMLVideoElement,
-      ) => Promise<
-        Array<{
-          bbox: [number, number, number, number];
-          class: string;
-          score?: number;
-        }>
-      >;
-    } | null = null;
-    let frameCount = 0;
-    async function loadModel() {
+    async function pollDetections() {
       try {
-        const coco = await import("@tensorflow-models/coco-ssd");
-        model = await coco.load({ base: "lite_mobilenet_v2" });
-        if (!cancelled) setModelState("VISION MODEL READY");
-        const loop = async () => {
-          if (cancelled) return;
-          const video = videoRef.current;
-          if (
-            model &&
-            video &&
-            video.readyState >= 2 &&
-            frameCount++ % 7 === 0
-          ) {
-            const predictions = await model.detect(video);
-            if (!cancelled) {
-              const next = predictions
-                .filter((item) => (item.score || 0) > 0.35)
-                .map((item) => ({
-                  bbox: item.bbox,
-                  class: item.class,
-                  score: item.score || 0,
-                  born: performance.now(),
-                }));
-              setDetections(next);
-              next
-                .filter((item) => item.score > 0.6)
-                .forEach((item) => {
-                  const previous = lastLogRef.current[item.class] || 0;
-                  if (Date.now() - previous > 3000) {
-                    lastLogRef.current[item.class] = Date.now();
-                    captureEvent(item.class, item.score, item.bbox);
-                  }
-                });
+        const response = await fetch(`${visionBackendUrl}/detections`, {
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Vision backend is not ready");
+        const payload = (await response.json()) as { detections: Detection[] };
+        if (cancelled) return;
+        setDetections(payload.detections);
+        payload.detections
+          .filter((item) => item.score > 0.6)
+          .forEach((item) => {
+            const previous = lastLogRef.current[item.class] || 0;
+            if (Date.now() - previous > 3000) {
+              lastLogRef.current[item.class] = Date.now();
+              setEvents((current) =>
+                [
+                  {
+                    id: Date.now(),
+                    timestamp: new Date().toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    }),
+                    label: item.class,
+                    confidence: item.score,
+                    thumbnail_base64: "",
+                  },
+                  ...current,
+                ].slice(0, 8),
+              );
             }
-          }
-          rafRef.current = requestAnimationFrame(loop);
-        };
-        loop();
+          });
       } catch {
-        if (!cancelled) setModelState("VISION MODEL OFFLINE");
+        if (!cancelled) {
+          setCameraState("VISION BACKEND OFFLINE");
+          setModelState("START BACKEND TO CONNECT");
+          setDetections([]);
+        }
       }
     }
-    loadModel();
+    void pollDetections();
+    const interval = window.setInterval(() => void pollDetections(), 500);
     return () => {
       cancelled = true;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      window.clearInterval(interval);
     };
-  }, [captureEvent]);
+  }, []);
 
   const selectAdminAction = (label: string) => {
     setAdminAction(label);
@@ -383,10 +247,15 @@ export default function Home() {
     if (label === "Camera controls") {
       setCameraPaused((paused) => {
         const nextPaused = !paused;
-        if (nextPaused) videoRef.current?.pause();
-        else void videoRef.current?.play();
-        return nextPaused;
-      });
+          if (nextPaused) {
+            streamRef.current?.removeAttribute("src");
+            setCameraState("CAMERA PAUSED");
+          } else if (streamRef.current) {
+            setCameraState("CONNECTING VISION BACKEND");
+            streamRef.current.src = `${visionBackendUrl}/video_feed`;
+          }
+          return nextPaused;
+        });
     }
     if (label === "System settings") setShowSystemSettings((open) => !open);
     if (label === "Export session") {
@@ -524,12 +393,10 @@ export default function Home() {
               <ScanSearch size={15} /> {showSystemSettings ? "SYSTEM SETTINGS" : modelState}
             </div>
           </div>
-          <div className="vision-frame" ref={viewportRef}>
-            <video
-              ref={videoRef}
+          <div className="vision-frame">
+            <img
+              ref={streamRef}
               className="vision-video"
-              muted
-              playsInline
               aria-label="Rover camera feed"
             />
             {cameraState !== "CAMERA ONLINE" && (
@@ -539,11 +406,6 @@ export default function Home() {
                 <span>Allow camera access to begin local vision capture</span>
               </div>
             )}
-            <CameraOverlay
-              detections={detections}
-              width={viewport.width}
-              height={viewport.height}
-            />
             <div className="camera-status">
               <span className="recording-dot" /> CAM-01: {cameraPaused ? "PAUSED" : "ACTIVE"}{" "}
               <small>LOCAL FEED</small>
@@ -554,7 +416,7 @@ export default function Home() {
             <div className="frame-corner corner-br" />
             <div className="vision-footer">
               <span>
-                <Radio size={13} /> 1280 x 720
+                <Radio size={13} /> YOLOV8N / MJPEG
               </span>
               <span>
                 AI SCAN <b>{detections.length ? "TRACKING" : "STANDBY"}</b>
@@ -564,8 +426,8 @@ export default function Home() {
           <div className="vision-note">
             <CheckCircle2 size={16} />
             <span>
-              All inference happens locally in your browser. No field imagery
-              leaves this device.
+              All inference happens in the local vision backend. No field
+              imagery leaves this device.
             </span>
             <span className="privacy-tag">PRIVATE BY DEFAULT</span>
           </div>
@@ -609,10 +471,14 @@ export default function Home() {
                     }}
                   >
                     <div className="event-thumb">
-                      <img
-                        src={event.thumbnail_base64}
-                        alt={`${event.label} detected`}
-                      />
+                      {event.thumbnail_base64 ? (
+                        <img
+                          src={event.thumbnail_base64}
+                          alt={`${event.label} detected`}
+                        />
+                      ) : (
+                        <ScanSearch size={22} />
+                      )}
                       <span className="thumb-index">0{index + 1}</span>
                     </div>
                     <div className="event-detail">
@@ -638,7 +504,6 @@ export default function Home() {
           </div>
         </aside>
       </section>
-      <canvas ref={frameRef} className="offscreen-canvas" aria-hidden="true" />
     </main>
   );
 }
